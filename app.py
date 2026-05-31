@@ -1,10 +1,9 @@
 import streamlit as st
 import tempfile
 import os
-from order_analysis import read_xlsx_numeric, angular_resample, order_map, plot_order_map
+from order_analysis import read_xlsx_numeric, angular_resample, order_map
 import matplotlib.pyplot as plt
 import numpy as np
-
 st.title("Order Map Analysis")
 
 uploaded_file = st.file_uploader("Excel dosyası yükle", type=["xlsx"])
