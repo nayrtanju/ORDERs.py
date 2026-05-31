@@ -9,7 +9,7 @@ st.title("Order Map Analysis")
 st.write("App started successfully")
 
 try:
-    from order_analysis import read_xlsx_numeric, angular_resample, order_map
+    from order_analysis import read_xlsx_numeric, angular_resample, order_map, extract_order_vs_rpm
     st.success("order_analysis.py başarıyla yüklendi")
 except Exception as e:
     st.error("order_analysis.py yüklenirken hata oluştu")
