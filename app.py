@@ -38,11 +38,37 @@ if uploaded_file:
             "ChC": data[:, 3],
         }
 
-        selected_channel = st.selectbox("Order Map kanalı", list(channels.keys()))
+        selected_channel = st.selectbox(
+            "Order Map kanalı",
+            list(channels.keys())
+        )
 
-        samples_per_rev = st.slider("Samples per revolution", 128, 2048, 512)
-        max_order = st.slider("Max order", 5, 50, 30)
-        target_order = st.number_input("Çizilecek order", value=10.0)
+        samples_per_rev = st.slider(
+            "Samples per revolution",
+            128,
+            2048,
+            512
+        )
+
+        max_order = st.slider(
+            "Max order",
+            5,
+            50,
+            30
+        )
+
+        target_order = st.number_input(
+            "Çizilecek order",
+            value=10.0
+        )
+
+        cal_factor = st.number_input(
+            "Amplitude Calibration Factor",
+            min_value=0.01,
+            max_value=10.0,
+            value=0.50,
+            step=0.01
+        )
 
         if st.button("Order Map Oluştur"):
             with st.spinner("Order Map hesaplanıyor..."):
@@ -68,7 +94,7 @@ if uploaded_file:
                 r = rpms[idx]
                 s = spec[idx]
 
-                db = 20 * np.log10(np.maximum(s, 1e-12))
+                db = 20 * np.log10(np.maximum(s * cal_factor, 1e-12))
 
                 fig, ax = plt.subplots(figsize=(11, 7))
 
@@ -81,14 +107,23 @@ if uploaded_file:
                     cmap="jet"
                 )
 
-                fig.colorbar(im, ax=ax, label="Amplitude [dB re 1 m/s²]")
+                fig.colorbar(
+                    im,
+                    ax=ax,
+                    label="Amplitude [dB re 1 m/s²]"
+                )
+
                 ax.set_xlabel("Order")
                 ax.set_ylabel("RPM")
-                ax.set_title(f"Order Map - {selected_channel}")
+                ax.set_title(
+                    f"Order Map - {selected_channel} | Cal Factor = {cal_factor}"
+                )
 
                 st.pyplot(fig)
 
-                st.subheader(f"{target_order}. Order vs RPM - Tüm Kanallar")
+                st.subheader(
+                    f"{target_order}. Order vs RPM - Tüm Kanallar"
+                )
 
                 fig2, ax2 = plt.subplots(figsize=(11, 7))
 
@@ -117,6 +152,8 @@ if uploaded_file:
                         smooth=True
                     )
 
+                    amp_sorted = amp_sorted * cal_factor
+
                     ax2.plot(
                         rpm_sorted,
                         amp_sorted,
@@ -124,8 +161,12 @@ if uploaded_file:
                     )
 
                 ax2.set_xlabel("RPM")
-                ax2.set_ylabel(f"{target_order}. Order Amplitude [m/s² RMS]")
-                ax2.set_title(f"{target_order}. Order vs RPM - All Channels")
+                ax2.set_ylabel(
+                    f"{target_order}. Order Amplitude [m/s²] Calibrated"
+                )
+                ax2.set_title(
+                    f"{target_order}. Order vs RPM - All Channels | Cal Factor = {cal_factor}"
+                )
                 ax2.grid(True, alpha=0.3)
                 ax2.legend()
 
