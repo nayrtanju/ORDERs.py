@@ -6,12 +6,15 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 st.title("Order Map Analysis")
-st.write("App started successfully")
 
 try:
-    from order_analysis import read_xlsx_numeric, angular_resample, order_map, extract_order_vs_rpm
-    st.success("order_analysis.py başarıyla yüklendi")
-except Exception as e:
+    from order_analysis import (
+        read_xlsx_numeric,
+        angular_resample,
+        order_map,
+        extract_order_vs_rpm
+    )
+except Exception:
     st.error("order_analysis.py yüklenirken hata oluştu")
     st.code(traceback.format_exc())
     st.stop()
@@ -25,10 +28,6 @@ if uploaded_file:
             xlsx_path = tmp.name
 
         headers, data = read_xlsx_numeric(xlsx_path)
-
-        st.write("Excel başarıyla okundu")
-        st.write("Headers:", headers)
-        st.write("Data shape:", data.shape)
 
         time = data[:, 0]
         rpm = data[:, 4]
@@ -47,10 +46,14 @@ if uploaded_file:
 
         if st.button("Order Map Oluştur"):
             with st.spinner("Order Map hesaplanıyor..."):
+
                 sig = channels[selected_channel]
 
                 theta_u, x_u, rpm_u = angular_resample(
-                    time, rpm, sig, samples_per_rev=samples_per_rev
+                    time,
+                    rpm,
+                    sig,
+                    samples_per_rev=samples_per_rev
                 )
 
                 orders, rpms, spec = order_map(
@@ -68,12 +71,14 @@ if uploaded_file:
                 db = 20 * np.log10(np.maximum(s, 1e-12))
 
                 fig, ax = plt.subplots(figsize=(11, 7))
+
                 im = ax.imshow(
                     db,
                     aspect="auto",
                     origin="lower",
                     extent=[orders[0], orders[-1], r[0], r[-1]],
-                    interpolation="nearest"
+                    interpolation="nearest",
+                    cmap="jet"
                 )
 
                 fig.colorbar(im, ax=ax, label="Amplitude [dB re 1 m/s²]")
@@ -88,8 +93,12 @@ if uploaded_file:
                 fig2, ax2 = plt.subplots(figsize=(11, 7))
 
                 for name, sig in channels.items():
+
                     theta_u, x_u, rpm_u = angular_resample(
-                        time, rpm, sig, samples_per_rev=samples_per_rev
+                        time,
+                        rpm,
+                        sig,
+                        samples_per_rev=samples_per_rev
                     )
 
                     orders, rpms, spec = order_map(
@@ -99,22 +108,23 @@ if uploaded_file:
                         samples_per_rev=samples_per_rev,
                         max_order=max_order
                     )
-rpm_sorted, amp_sorted = extract_order_vs_rpm(
-    orders,
-    rpms,
-    spec,
-    target_order=target_order,
-    smooth=True
-)
 
-ax2.plot(
-    rpm_sorted,
-    amp_sorted,
-    label=name
-)
+                    rpm_sorted, amp_sorted = extract_order_vs_rpm(
+                        orders,
+                        rpms,
+                        spec,
+                        target_order=target_order,
+                        smooth=True
+                    )
+
+                    ax2.plot(
+                        rpm_sorted,
+                        amp_sorted,
+                        label=name
+                    )
 
                 ax2.set_xlabel("RPM")
-                ax2.set_ylabel(f"{target_order}. Order Amplitude [m/s²]")
+                ax2.set_ylabel(f"{target_order}. Order Amplitude [m/s² RMS]")
                 ax2.set_title(f"{target_order}. Order vs RPM - All Channels")
                 ax2.grid(True, alpha=0.3)
                 ax2.legend()
