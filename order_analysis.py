@@ -134,13 +134,13 @@ def order_map(
     samples_per_rev=512,
     revs_per_block=16,
     overlap=0.75,
-    max_order=30,
-    amplitude_mode="rms"
+    max_order=30
 ):
     nper = int(samples_per_rev * revs_per_block)
     hop = max(1, int(nper * (1 - overlap)))
 
     win = np.hanning(nper)
+    win_sum = np.sum(win)
 
     orders = np.fft.rfftfreq(
         nper,
@@ -159,18 +159,11 @@ def order_map(
 
         X = np.fft.rfft(block * win)
 
-        if amplitude_mode == "rms":
-            amp = (
-                np.sqrt(2)
-                * np.abs(X)
-                / np.sqrt(np.sum(win ** 2))
-            )
-        else:
-            amp = (
-                2
-                * np.abs(X)
-                / np.sum(win)
-            )
+        amp = (
+            2
+            * np.abs(X)
+            / win_sum
+        )
 
         specs.append(amp[keep])
         rpms.append(np.mean(rpm_u[start:start + nper]))
