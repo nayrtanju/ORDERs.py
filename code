@@ -1,0 +1,59 @@
+import numpy as np
+import pandas as pd
+from scipy.interpolate import interp1d
+from scipy.signal import stft
+
+
+def load_data(uploaded_file):
+    df = pd.read_excel(uploaded_file)
+
+    time = df["Time (s)"].values
+    rpm = df["RPM"].values
+
+    channels = {
+        "ChA": df["ChA (m/s²)"].values,
+        "ChB": df["ChB (m/s²)"].values,
+        "ChC": df["ChC (m/s²)"].values
+    }
+
+    return time, rpm, channels
+
+
+def rpm_to_angle(time, rpm):
+    omega = rpm * 2 * np.pi / 60
+    angle = np.cumsum(omega * np.gradient(time))
+    return angle
+
+
+def extract_order(signal, angle, order=10):
+    angle_uniform = np.linspace(angle[0], angle[-1], len(angle))
+
+    f = interp1d(angle, signal,
+                 bounds_error=False,
+                 fill_value="extrapolate")
+
+    sig_angle = f(angle_uniform)
+
+    complex_order = np.exp(-1j * order * angle_uniform)
+
+    amp = np.abs(
+        np.convolve(
+            sig_angle * complex_order,
+            np.ones(1024)/1024,
+            mode="same"
+        )
+    )
+
+    return amp
+
+
+def order_map(signal, fs):
+
+    f, t, Z = stft(
+        signal,
+        fs=fs,
+        nperseg=4096,
+        noverlap=3072
+    )
+
+    return f, t, np.abs(Z)
