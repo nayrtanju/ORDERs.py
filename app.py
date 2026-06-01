@@ -66,7 +66,7 @@ if uploaded_file:
             "Amplitude Calibration Factor",
             min_value=0.01,
             max_value=10.0,
-            value=0.50,
+            value=1.0,
             step=0.01
         )
 
