@@ -159,8 +159,13 @@ def order_map(
 
         X = np.fft.rfft(block * win)
 
+        # RMS line amplitude
+        # Eski peak hesap:
+        # amp = 2 * np.abs(X) / win_sum
+        #
+        # Yeni RMS hesap:
         amp = (
-            2
+            np.sqrt(2)
             * np.abs(X)
             / win_sum
         )
@@ -261,6 +266,7 @@ def extract_order_vs_rpm(
         )
         amp = spec[:, order_idx]
     else:
+        # Order band RMS energy
         amp = np.sqrt(
             np.sum(spec[:, band] ** 2, axis=1)
         )
