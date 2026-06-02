@@ -159,11 +159,9 @@ def order_map(
 
         X = np.fft.rfft(block * win)
 
-        # PEAK amplitude scaling
-        # Eski RMS benzeri scaling:
-        # amp = np.sqrt(2) * np.abs(X) / win_sum
+        # RMS scaling
         amp = (
-            2.0
+            np.sqrt(2)
             * np.abs(X)
             / win_sum
         )
@@ -287,7 +285,7 @@ def extract_order_vs_rpm(
     rpms,
     spec,
     target_order=10.0,
-    width=0.15,
+    width=1.0,
     rpm_step=10,
     smooth=True
 ):
@@ -303,7 +301,8 @@ def extract_order_vs_rpm(
         )
         amp = spec[:, order_idx]
     else:
-        # Band energy integration
+        # 10. order etrafındaki geniş band enerjisini toplar.
+        # width=1.0 -> 9.5 ile 10.5 order arası.
         amp = np.sqrt(
             np.sum(
                 spec[:, band] ** 2,
