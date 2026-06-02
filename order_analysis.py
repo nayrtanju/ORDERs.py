@@ -300,12 +300,13 @@ def extract_order_vs_rpm(
         )
         amp = spec[:, order_idx]
     else:
-        # TEST METHOD:
-        # Artemis Width=0.15 davranışını test etmek için
-        # band enerjisini toplamak yerine band içindeki maksimum çizgiyi alıyoruz.
-        amp = np.max(
-            spec[:, band],
-            axis=1
+        # Artemis'e daha yakın yöntem:
+        # 10. order çevresindeki band enerjisini topluyoruz.
+        amp = np.sqrt(
+            np.sum(
+                spec[:, band] ** 2,
+                axis=1
+            )
         )
 
     sort_idx = np.argsort(rpms)
