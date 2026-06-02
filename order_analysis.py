@@ -159,7 +159,7 @@ def order_map(
 
         X = np.fft.rfft(block * win)
 
-        # RMS scaling
+        # Artemis'e daha yakın RMS scaling
         amp = (
             np.sqrt(2)
             * np.abs(X)
@@ -285,7 +285,7 @@ def extract_order_vs_rpm(
     rpms,
     spec,
     target_order=10.0,
-    width=1.0,
+    width=0.15,
     rpm_step=10,
     smooth=True
 ):
@@ -301,8 +301,7 @@ def extract_order_vs_rpm(
         )
         amp = spec[:, order_idx]
     else:
-        # 10. order etrafındaki geniş band enerjisini toplar.
-        # width=1.0 -> 9.5 ile 10.5 order arası.
+        # Dar order bandı: Artemis'e daha yakın ayar
         amp = np.sqrt(
             np.sum(
                 spec[:, band] ** 2,
