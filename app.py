@@ -3,12 +3,13 @@ import tempfile
 import os
 import traceback
 from io import BytesIO
-import smtplib
-from email.message import EmailMessage
 
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+
+from openpyxl.chart import LineChart, Reference
+from openpyxl.styles import Font, PatternFill
 
 
 st.set_page_config(
@@ -59,37 +60,105 @@ TARGETS = {
 TARGET_ORDERS = [10.0, 20.0]
 
 
-def send_email_report(
-    to_email,
-    subject,
-    body,
-    attachment_bytes,
-    attachment_name
-):
-    msg = EmailMessage()
-    msg["From"] = st.secrets["email"]["sender"]
-    msg["To"] = to_email
-    msg["Subject"] = subject
+def format_comparison_sheet(writer, sheet_name):
+    ws = writer.book[sheet_name]
 
-    msg.set_content(body)
-
-    msg.add_attachment(
-        attachment_bytes,
-        maintype="application",
-        subtype="vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        filename=attachment_name
+    green_fill = PatternFill(
+        start_color="C6EFCE",
+        end_color="C6EFCE",
+        fill_type="solid"
     )
 
-    with smtplib.SMTP(
-        st.secrets["email"]["smtp_server"],
-        int(st.secrets["email"]["smtp_port"])
-    ) as server:
-        server.starttls()
-        server.login(
-            st.secrets["email"]["sender"],
-            st.secrets["email"]["password"]
-        )
-        server.send_message(msg)
+    red_fill = PatternFill(
+        start_color="FFC7CE",
+        end_color="FFC7CE",
+        fill_type="solid"
+    )
+
+    header_fill = PatternFill(
+        start_color="D9EAF7",
+        end_color="D9EAF7",
+        fill_type="solid"
+    )
+
+    for cell in ws[1]:
+        cell.font = Font(bold=True)
+        cell.fill = header_fill
+
+    status_col = None
+
+    for cell in ws[1]:
+        if cell.value == "Status":
+            status_col = cell.column
+            break
+
+    if status_col is not None:
+        for row in range(2, ws.max_row + 1):
+            status_cell = ws.cell(row=row, column=status_col)
+
+            if status_cell.value == "PASS":
+                fill = green_fill
+            elif status_cell.value == "FAIL":
+                fill = red_fill
+            else:
+                fill = None
+
+            if fill is not None:
+                for col in range(1, ws.max_column + 1):
+                    ws.cell(row=row, column=col).fill = fill
+
+    for col in ws.columns:
+        col_letter = col[0].column_letter
+        ws.column_dimensions[col_letter].width = 22
+
+
+def add_curve_chart_to_sheet(writer, sheet_name, order_value):
+    ws = writer.book[sheet_name]
+
+    max_row = ws.max_row
+    max_col = ws.max_column
+
+    header_fill = PatternFill(
+        start_color="D9EAF7",
+        end_color="D9EAF7",
+        fill_type="solid"
+    )
+
+    for cell in ws[1]:
+        cell.font = Font(bold=True)
+        cell.fill = header_fill
+
+    for col in ws.columns:
+        col_letter = col[0].column_letter
+        ws.column_dimensions[col_letter].width = 16
+
+    chart = LineChart()
+    chart.title = f"{int(order_value)}th Order Curves vs Target"
+    chart.style = 13
+    chart.y_axis.title = "Amplitude [m/s²]"
+    chart.x_axis.title = "RPM"
+    chart.height = 14
+    chart.width = 24
+
+    data = Reference(
+        ws,
+        min_col=2,
+        max_col=max_col,
+        min_row=1,
+        max_row=max_row
+    )
+
+    categories = Reference(
+        ws,
+        min_col=1,
+        min_row=2,
+        max_row=max_row
+    )
+
+    chart.add_data(data, titles_from_data=True)
+    chart.set_categories(categories)
+
+    ws.add_chart(chart, "G2")
 
 
 def make_excel_report(vehicle_info, results_by_order, curves_by_order):
@@ -104,18 +173,30 @@ def make_excel_report(vehicle_info, results_by_order, curves_by_order):
 
         for order_value, result_df in results_by_order.items():
             sheet_name = f"{int(order_value)} Order Comparison"
+            sheet_name = sheet_name[:31]
+
             result_df.to_excel(
                 writer,
-                sheet_name=sheet_name[:31],
+                sheet_name=sheet_name,
                 index=False
             )
 
+            format_comparison_sheet(writer, sheet_name)
+
         for order_value, curve_df in curves_by_order.items():
             sheet_name = f"{int(order_value)} Order Curves"
+            sheet_name = sheet_name[:31]
+
             curve_df.to_excel(
                 writer,
-                sheet_name=sheet_name[:31],
+                sheet_name=sheet_name,
                 index=False
+            )
+
+            add_curve_chart_to_sheet(
+                writer,
+                sheet_name,
+                order_value
             )
 
     output.seek(0)
@@ -597,50 +678,12 @@ if st.button("Run Order Analysis", type="primary"):
                     raw_curves_by_order
                 )
 
-                report_filename = f"{vin_number}_order_analysis_report.xlsx"
-
                 st.download_button(
                     label="Download Excel Report",
                     data=excel_report,
-                    file_name=report_filename,
+                    file_name=f"{vin_number}_order_analysis_report.xlsx",
                     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
                 )
-
-                st.subheader("Send Report by Email")
-
-                recipient_email = st.text_input(
-                    "Recipient email address",
-                    placeholder="example@company.com"
-                )
-
-                if st.button("Send Report by Email"):
-
-                    if recipient_email.strip() == "":
-                        st.warning("Please enter a recipient email address.")
-
-                    else:
-                        try:
-                            send_email_report(
-                                to_email=recipient_email.strip(),
-                                subject=f"Order Analysis Report - VIN {vin_number}",
-                                body=f"""
-Order analysis report is attached.
-
-VIN: {vin_number}
-Fuel Type: {fuel_type}
-Axle Type: {axle_type}
-Target Orders: 10th and 20th
-Overall Assessment: {overall_status}
-""",
-                                attachment_bytes=excel_report.getvalue(),
-                                attachment_name=report_filename
-                            )
-
-                            st.success(f"Report sent to {recipient_email}")
-
-                        except Exception:
-                            st.error("Email gönderilirken hata oluştu.")
-                            st.code(traceback.format_exc())
 
         os.remove(xlsx_path)
 
