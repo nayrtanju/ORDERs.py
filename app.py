@@ -615,6 +615,42 @@ if st.button("Run Order Analysis", type="primary"):
                 if not (result_df["Status"] == "PASS").all():
                     overall_status = "FAIL"
 
+            st.subheader("Overall Assessment")
+
+            if overall_status == "PASS":
+                st.success("Overall Assessment: PASS")
+            else:
+                st.error("Overall Assessment: FAIL")
+
+            vehicle_info = {
+                "VIN": vin_number,
+                "Fuel Type": fuel_type,
+                "Axle Type": axle_type,
+                "Target Orders": "10, 20",
+                "Order Width": order_width,
+                "RPM Step": rpm_step,
+                "Samples per Rev": samples_per_rev,
+                "Revs per Block": revs_per_block,
+                "Overlap": overlap,
+                "Calibration Factor": cal_factor,
+                "Max Order": max_order,
+                "Overall Assessment": overall_status
+            }
+
+            excel_report = make_excel_report(
+                vehicle_info,
+                results_by_order,
+                raw_curves_by_order
+            )
+
+            st.download_button(
+                label="📊 Download Excel Report",
+                data=excel_report,
+                file_name=f"{vin_number}_order_analysis_report.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                use_container_width=True
+            )
+
             tab1, tab2, tab3, tab4 = st.tabs(
                 [
                     "10th Order Target Comparison",
@@ -686,22 +722,6 @@ if st.button("Run Order Analysis", type="primary"):
                     else:
                         st.error(f"{int(order_value)}th Order Assessment: FAIL")
 
-                    png_buffer = BytesIO()
-                    fig_cmp.savefig(
-                        png_buffer,
-                        format="png",
-                        dpi=200,
-                        bbox_inches="tight"
-                    )
-                    png_buffer.seek(0)
-
-                    st.download_button(
-                        label=f"Download {int(order_value)}th Order Target Comparison PNG",
-                        data=png_buffer,
-                        file_name=f"{vin_number}_{int(order_value)}th_order_target_comparison.png",
-                        mime="image/png"
-                    )
-
             with tab3:
 
                 st.subheader(f"Order Map - {selected_channel}")
@@ -769,42 +789,6 @@ if st.button("Run Order Analysis", type="primary"):
 
                 st.dataframe(
                     raw_curves_by_order[20.0],
-                    use_container_width=True
-                )
-
-                st.subheader("Overall Assessment")
-
-                if overall_status == "PASS":
-                    st.success("Overall Assessment: PASS")
-                else:
-                    st.error("Overall Assessment: FAIL")
-
-                vehicle_info = {
-                    "VIN": vin_number,
-                    "Fuel Type": fuel_type,
-                    "Axle Type": axle_type,
-                    "Target Orders": "10, 20",
-                    "Order Width": order_width,
-                    "RPM Step": rpm_step,
-                    "Samples per Rev": samples_per_rev,
-                    "Revs per Block": revs_per_block,
-                    "Overlap": overlap,
-                    "Calibration Factor": cal_factor,
-                    "Max Order": max_order,
-                    "Overall Assessment": overall_status
-                }
-
-                excel_report = make_excel_report(
-                    vehicle_info,
-                    results_by_order,
-                    raw_curves_by_order
-                )
-
-                st.download_button(
-                    label="Download Excel Report",
-                    data=excel_report,
-                    file_name=f"{vin_number}_order_analysis_report.xlsx",
-                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                     use_container_width=True
                 )
 
