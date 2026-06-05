@@ -102,11 +102,33 @@ def angular_resample(time, rpm, signal, samples_per_rev=512):
     rpm = rpm[mask]
     signal = signal[mask]
 
+    # Time sıralı değilse sıralıyoruz, satır silmiyoruz.
+    sort_idx = np.argsort(time)
+    time = time[sort_idx]
+    rpm = rpm[sort_idx]
+    signal = signal[sort_idx]
+
     dt = np.diff(time, prepend=time[0])
 
-    dt[0] = np.median(
-        np.diff(time[:min(len(time), 10000)])
+    positive_dt = dt[dt > 0]
+
+    if len(positive_dt) == 0:
+        raise ValueError(
+            "Time vector does not contain positive time steps. "
+            "Please check the time column precision."
+        )
+
+    median_dt = np.median(positive_dt)
+
+    # Pico CSV export'ta düşük decimal precision nedeniyle dt=0 oluşabilir.
+    # Satır silmiyoruz; dt<=0 noktalarını median pozitif dt ile dolduruyoruz.
+    dt = np.where(
+        dt <= 0,
+        median_dt,
+        dt
     )
+
+    dt[0] = median_dt
 
     omega = 2 * np.pi * rpm / 60.0
     theta = np.cumsum(omega * dt)
@@ -159,7 +181,6 @@ def order_map(
 
         X = np.fft.rfft(block * win)
 
-        # Artemis'e daha yakın RMS scaling
         amp = (
             np.sqrt(2)
             * np.abs(X)
@@ -301,7 +322,6 @@ def extract_order_vs_rpm(
         )
         amp = spec[:, order_idx]
     else:
-        # Dar order bandı: Artemis'e daha yakın ayar
         amp = np.sqrt(
             np.sum(
                 spec[:, band] ** 2,
