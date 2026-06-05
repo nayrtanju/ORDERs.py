@@ -36,6 +36,7 @@ except Exception:
 
 MAX_FILE_SIZE_MB = 500
 MAX_ROWS = 3000000
+G_TO_MS2 = 9.80665
 
 
 TARGETS = {
@@ -65,12 +66,27 @@ TARGETS = {
 TARGET_ORDERS = [10.0, 20.0]
 
 
+def convert_csv_g_to_ms2_if_needed(headers, data):
+    converted_channels = []
+
+    for col_idx in [1, 2, 3]:
+        header = str(headers[col_idx]).lower()
+
+        if "(g)" in header or header.strip().endswith(" g"):
+            data[:, col_idx] = data[:, col_idx] * G_TO_MS2
+            converted_channels.append(headers[col_idx])
+
+    return data, converted_channels
+
+
 def load_measurement_file(uploaded_file):
     file_extension = uploaded_file.name.split(".")[-1].lower()
 
     if uploaded_file.size > MAX_FILE_SIZE_MB * 1024 * 1024:
         st.error(f"File exceeds maximum allowed size: {MAX_FILE_SIZE_MB} MB.")
         st.stop()
+
+    converted_channels = []
 
     if file_extension == "xlsx":
         temp_file = None
@@ -103,6 +119,11 @@ def load_measurement_file(uploaded_file):
             headers = list(df.columns)
             data = df.to_numpy(dtype=float)
 
+            data, converted_channels = convert_csv_g_to_ms2_if_needed(
+                headers,
+                data
+            )
+
         except Exception:
             st.error("CSV file could not be read. Please check delimiter and numeric data format.")
             st.code(traceback.format_exc())
@@ -133,8 +154,6 @@ def load_measurement_file(uploaded_file):
     time = data[:, 0]
     rpm = data[:, 4]
 
-    # Tekrarlayan time değerlerine izin veriyoruz.
-    # Sadece gerçekten geriye giden time değerleri hata oluşturur.
     if np.any(np.diff(time) < 0):
         st.error("Time column contains decreasing values.")
         st.stop()
@@ -142,6 +161,12 @@ def load_measurement_file(uploaded_file):
     if np.any(rpm <= 0):
         st.error("RPM column must contain only positive values.")
         st.stop()
+
+    if converted_channels:
+        st.info(
+            "CSV detected: vibration channels converted from g to m/s²: "
+            + ", ".join(map(str, converted_channels))
+        )
 
     return headers, data
 
