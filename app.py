@@ -55,16 +55,11 @@ TARGETS = {
             "amp": np.array([2.5, 2.5, 2.5, 6.25, 10.0, 10.0, 10.0, 10.0])
         },
         "Rear Axle": {
-            "rpm": np.array([5.0, 5.0, 5.0, 10.0, 12.5, 12.5, 12.5, 12.5]),
+            "rpm": np.array([1000, 1500, 2000, 2500, 3000, 3500, 4000, 4500]),
             "amp": np.array([5.0, 5.0, 5.0, 10.0, 12.5, 12.5, 12.5, 12.5])
         }
     }
 }
-
-# Correct Gasoline Rear Axle RPM axis
-TARGETS["Gasoline"]["Rear Axle"]["rpm"] = np.array(
-    [1000, 1500, 2000, 2500, 3000, 3500, 4000, 4500]
-)
 
 
 TARGET_ORDERS = [10.0, 20.0]
@@ -138,8 +133,10 @@ def load_measurement_file(uploaded_file):
     time = data[:, 0]
     rpm = data[:, 4]
 
-    if not np.all(np.diff(time) > 0):
-        st.error("Time column must be strictly increasing.")
+    # Tekrarlayan time değerlerine izin veriyoruz.
+    # Sadece gerçekten geriye giden time değerleri hata oluşturur.
+    if np.any(np.diff(time) < 0):
+        st.error("Time column contains decreasing values.")
         st.stop()
 
     if np.any(rpm <= 0):
