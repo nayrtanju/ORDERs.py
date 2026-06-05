@@ -34,6 +34,10 @@ except Exception:
     st.stop()
 
 
+MAX_FILE_SIZE_MB = 100
+MAX_ROWS = 500000
+
+
 TARGETS = {
     "Diesel": {
         "Front Axle": {
@@ -51,14 +55,98 @@ TARGETS = {
             "amp": np.array([2.5, 2.5, 2.5, 6.25, 10.0, 10.0, 10.0, 10.0])
         },
         "Rear Axle": {
-            "rpm": np.array([1000, 1500, 2000, 2500, 3000, 3500, 4000, 4500]),
+            "rpm": np.array([5.0, 5.0, 5.0, 10.0, 12.5, 12.5, 12.5, 12.5]),
             "amp": np.array([5.0, 5.0, 5.0, 10.0, 12.5, 12.5, 12.5, 12.5])
         }
     }
 }
 
+# Correct Gasoline Rear Axle RPM axis
+TARGETS["Gasoline"]["Rear Axle"]["rpm"] = np.array(
+    [1000, 1500, 2000, 2500, 3000, 3500, 4000, 4500]
+)
+
 
 TARGET_ORDERS = [10.0, 20.0]
+
+
+def load_measurement_file(uploaded_file):
+    file_extension = uploaded_file.name.split(".")[-1].lower()
+
+    if uploaded_file.size > MAX_FILE_SIZE_MB * 1024 * 1024:
+        st.error(f"File exceeds maximum allowed size: {MAX_FILE_SIZE_MB} MB.")
+        st.stop()
+
+    if file_extension == "xlsx":
+        temp_file = None
+
+        try:
+            with tempfile.NamedTemporaryFile(
+                delete=False,
+                suffix=".xlsx"
+            ) as tmp:
+                tmp.write(uploaded_file.read())
+                temp_file = tmp.name
+
+            headers, data = read_xlsx_numeric(temp_file)
+
+        finally:
+            if temp_file and os.path.exists(temp_file):
+                try:
+                    os.remove(temp_file)
+                except Exception:
+                    pass
+
+    elif file_extension == "csv":
+        try:
+            df = pd.read_csv(
+                uploaded_file,
+                sep=None,
+                engine="python"
+            )
+
+            headers = list(df.columns)
+            data = df.to_numpy(dtype=float)
+
+        except Exception:
+            st.error("CSV file could not be read. Please check delimiter and numeric data format.")
+            st.code(traceback.format_exc())
+            st.stop()
+
+    else:
+        st.error("Unsupported file format. Please upload .xlsx or .csv file.")
+        st.stop()
+
+    if data.ndim != 2 or data.shape[1] < 5:
+        st.error(
+            "Measurement file must contain at least 5 columns: Time, ChA, ChB, ChC, RPM."
+        )
+        st.stop()
+
+    if data.shape[0] > MAX_ROWS:
+        st.error(f"Dataset exceeds maximum row limit: {MAX_ROWS} rows.")
+        st.stop()
+
+    if data.shape[0] < 10:
+        st.error("Dataset is too short for order analysis.")
+        st.stop()
+
+    if not np.all(np.isfinite(data[:, :5])):
+        st.error("Dataset contains NaN or non-numeric values in the first 5 columns.")
+        st.stop()
+
+    time = data[:, 0]
+    rpm = data[:, 4]
+
+    if not np.all(np.diff(time) > 0):
+        st.error("Time column must be strictly increasing.")
+        st.stop()
+
+    if np.any(rpm <= 0):
+        st.error("RPM column must contain only positive values.")
+        st.stop()
+
+    return headers, data
 
 
 def format_comparison_sheet(writer, sheet_name):
@@ -447,9 +535,10 @@ if vin_number and not vin_valid:
 st.subheader("Measurement Data")
 
 uploaded_file = st.file_uploader(
-    "Upload Excel Data File",
-    type=["xlsx"],
-    disabled=not vin_valid
+    "Upload Measurement File",
+    type=["xlsx", "csv"],
+    disabled=not vin_valid,
+    help="Supported formats: .xlsx and .csv"
 )
 
 
@@ -467,7 +556,7 @@ if not can_continue:
         )
     else:
         st.warning(
-            "Please select fuel type, select axle type, and upload Excel file."
+            "Please select fuel type, select axle type, and upload measurement file."
         )
     st.stop()
 
@@ -475,7 +564,7 @@ if not can_continue:
 target_rpm = TARGETS[fuel_type][axle_type]["rpm"]
 target_amp = TARGETS[fuel_type][axle_type]["amp"]
 
-st.success("Vehicle information and Excel file are ready for analysis.")
+st.success("Vehicle information and measurement file are ready for analysis.")
 
 info_cols = st.columns(3)
 info_cols[0].metric("VIN", vin_number)
@@ -517,11 +606,7 @@ with st.expander("Advanced Settings", expanded=False):
 if st.button("Run Order Analysis", type="primary"):
 
     try:
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".xlsx") as tmp:
-            tmp.write(uploaded_file.read())
-            xlsx_path = tmp.name
-
-        headers, data = read_xlsx_numeric(xlsx_path)
+        headers, data = load_measurement_file(uploaded_file)
 
         time = data[:, 0]
         rpm = data[:, 4]
@@ -759,8 +844,6 @@ if st.button("Run Order Analysis", type="primary"):
                     file_name=f"{vin_number}_order_analysis_report.xlsx",
                     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
                 )
-
-        os.remove(xlsx_path)
 
     except Exception:
         st.error("Uygulama çalışırken hata oluştu")
