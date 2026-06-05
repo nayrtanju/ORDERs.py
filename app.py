@@ -2,6 +2,7 @@ import streamlit as st
 import tempfile
 import os
 import traceback
+import re
 from io import BytesIO
 
 import matplotlib.pyplot as plt
@@ -139,26 +140,9 @@ def create_curve_plot_png(
 ):
     fig, ax = plt.subplots(figsize=(14, 8))
 
-    ax.plot(
-        curve_df["RPM"],
-        curve_df["ChA"],
-        label="ChA",
-        linewidth=2
-    )
-
-    ax.plot(
-        curve_df["RPM"],
-        curve_df["ChB"],
-        label="ChB",
-        linewidth=2
-    )
-
-    ax.plot(
-        curve_df["RPM"],
-        curve_df["ChC"],
-        label="ChC",
-        linewidth=2
-    )
+    ax.plot(curve_df["RPM"], curve_df["ChA"], label="ChA", linewidth=2)
+    ax.plot(curve_df["RPM"], curve_df["ChB"], label="ChB", linewidth=2)
+    ax.plot(curve_df["RPM"], curve_df["ChC"], label="ChC", linewidth=2)
 
     ax.plot(
         curve_df["RPM"],
@@ -174,10 +158,7 @@ def create_curve_plot_png(
     )
 
     ax.set_xlabel("RPM", fontsize=13)
-    ax.set_ylabel(
-        f"{int(order_value)}. Order Amplitude [m/s²]",
-        fontsize=13
-    )
+    ax.set_ylabel(f"{int(order_value)}. Order Amplitude [m/s²]", fontsize=13)
 
     ax.grid(True, alpha=0.3)
     ax.legend(loc="upper right", fontsize=12)
@@ -221,7 +202,6 @@ def add_png_plot_to_sheet(
     )
 
     img = XLImage(img_buffer)
-
     img.width = 900
     img.height = 520
 
@@ -436,19 +416,31 @@ col1, col2, col3 = st.columns(3)
 with col1:
     vin_number = st.text_input(
         "VIN Number",
-        placeholder="Enter vehicle VIN number"
-    )
+        placeholder="Enter 17-character VIN",
+        max_chars=17
+    ).upper().strip()
+
+vin_valid = bool(
+    re.fullmatch(r"[A-Z0-9]{17}", vin_number)
+)
 
 with col2:
     fuel_type = st.selectbox(
         "Fuel Type",
-        ["Select fuel type", "Diesel", "Gasoline"]
+        ["Select fuel type", "Diesel", "Gasoline"],
+        disabled=not vin_valid
     )
 
 with col3:
     axle_type = st.selectbox(
         "Axle Type",
-        ["Select axle type", "Front Axle", "Rear Axle"]
+        ["Select axle type", "Front Axle", "Rear Axle"],
+        disabled=not vin_valid
+    )
+
+if vin_number and not vin_valid:
+    st.error(
+        "VIN must be exactly 17 characters and contain only letters and numbers."
     )
 
 
@@ -456,21 +448,27 @@ st.subheader("Measurement Data")
 
 uploaded_file = st.file_uploader(
     "Upload Excel Data File",
-    type=["xlsx"]
+    type=["xlsx"],
+    disabled=not vin_valid
 )
 
 
 can_continue = (
-    vin_number.strip() != ""
+    vin_valid
     and fuel_type != "Select fuel type"
     and axle_type != "Select axle type"
     and uploaded_file is not None
 )
 
 if not can_continue:
-    st.warning(
-        "Please enter VIN number, select fuel type, select axle type, and upload Excel file."
-    )
+    if not vin_valid:
+        st.warning(
+            "Please enter a valid 17-character VIN before selecting fuel type and uploading data."
+        )
+    else:
+        st.warning(
+            "Please select fuel type, select axle type, and upload Excel file."
+        )
     st.stop()
 
 
