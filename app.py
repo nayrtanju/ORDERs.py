@@ -12,14 +12,13 @@ import pandas as pd
 from openpyxl.styles import Font, PatternFill
 from openpyxl.drawing.image import Image as XLImage
 
-
 st.set_page_config(
-    page_title="Vehicle Order Analysis Tool",
+    page_title="Axle Whine Order Analysis Tool",
+    page_icon="🚗",
     layout="wide"
 )
 
-st.title("Vehicle Order Analysis Tool")
-
+st.title("🚗 Axle Whine Order Analysis Tool")
 
 try:
     from order_analysis import (
